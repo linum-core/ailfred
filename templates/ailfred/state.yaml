@@ -1,0 +1,44 @@
+# Estado da máquina do goal. Escritor único: a sessão principal (host).
+# Subagents NUNCA escrevem aqui — devolvem handoff e o host aplica.
+goal:
+  slug: "{{SLUG}}"
+  title: "{{TITLE}}"
+  created: {{DATE}}
+  base_branch: "{{BRANCH}}"
+  work_branch: null # branch criado para o goal, quando aplicável
+  status: planning # planning | planned | executing | blocked | validating | done | cancelled
+  execution_mode: null # sequential | worktrees
+  max_parallel: 3
+  prd_version: 1
+  plan_version: 1
+
+# Origem do goal. Preenchido só quando a entrada foi uma lista de to-dos
+# (skill `ailfred-list-intake`). writeback=false para lista colada, que não tem arquivo.
+source:
+  file: null # ex.: todo.md
+  section: null # cluster escolhido no gate G-G0
+  parsed_at: null
+  parse_output: null # ex.: .claude/ailfred/<slug>/source-items.yaml
+  writeback: false
+  items_total: 0
+  items_pending: 0
+  items_done: [] # item_id cujas tasks fecharam todas
+  items_synced: [] # item_id já marcado na origem (token ailfred-accept-sync)
+
+# Tokens de gate aprovados pelo desenvolvedor, em ordem.
+gates: []
+# - { id: G-G2, token: ailfred-prd-approve, at: {{DATE}} }
+
+# Preenchido pelo host depois do gate G-G3 (plano aprovado).
+steps: []
+# - id: S01
+#   status: pending # pending | active | done | blocked
+#   tasks:
+#     - { id: S01-T01, status: pending, wave: 1, worktree: null, branch: null }
+
+# Worktrees vivos (espelha `bash .claude/scripts/ailfred-worktree.sh list <slug>`).
+worktrees: []
+# - { task: S01-T02, branch: ailfred/{{SLUG}}/S01-T02, path: "../.ailfred-worktrees/..." }
+
+# Assuntos deliberadamente adiados — saem do goal, não morrem.
+followups: []

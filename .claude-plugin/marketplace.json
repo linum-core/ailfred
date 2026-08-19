@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "ailfred-marketplace",
+  "owner": {
+    "name": "GgvGomes",
+    "url": "https://github.com/GgvGomes"
+  },
+  "description": "Marketplace hosting the Ailfred plugin: PRD-first decomposition of large requests and to-do lists into executable steps and tasks.",
+  "plugins": [
+    {
+      "name": "ailfred",
+      "source": "./",
+      "description": "Um pedido grande ou uma lista de to-dos entram; PRD aprovado, steps e tasks verificaveis saem — com execucao sequencial ou em git worktrees paralelos.",
+      "category": "workflow",
+      "keywords": [
+        "planning",
+        "decomposition",
+        "backlog",
+        "worktrees"
+      ]
+    }
+  ]
+}
