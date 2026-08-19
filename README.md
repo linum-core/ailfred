@@ -20,7 +20,7 @@ desenvolvedor.
 ## Instalação
 
 ```bash
-claude plugin marketplace add GgvGomes/ailfred
+claude plugin marketplace add linum-core/ailfred
 claude plugin install ailfred@ailfred-marketplace
 ```
 
@@ -29,7 +29,7 @@ Por projeto e versionado no repositório que consome — `.claude/settings.json`
 ```json
 {
   "extraKnownMarketplaces": {
-    "ailfred-marketplace": { "source": { "source": "github", "repo": "GgvGomes/ailfred" } }
+    "ailfred-marketplace": { "source": { "source": "github", "repo": "linum-core/ailfred" } }
   },
   "enabledPlugins": { "ailfred@ailfred-marketplace": true }
 }

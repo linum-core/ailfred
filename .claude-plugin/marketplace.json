@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "ailfred-marketplace",
   "owner": {
-    "name": "GgvGomes",
-    "url": "https://github.com/GgvGomes"
+    "name": "Linum Core",
+    "url": "https://github.com/linum-core"
   },
   "description": "Marketplace hosting the Ailfred plugin: PRD-first decomposition of large requests and to-do lists into executable steps and tasks.",
   "plugins": [

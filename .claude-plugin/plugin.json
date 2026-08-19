@@ -2,14 +2,14 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "ailfred",
   "displayName": "Ailfred",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turns one oversized request — or an entire to-do list — into an approvable PRD, then into steps and tasks a worker can finish and prove, executed sequentially or in parallel git worktrees. Domain-agnostic: /ailfred, /ailfred-execute, /ailfred-status, four agents (architect, step runner, task worker, validator), decomposition and intake doctrine, and scripts for scaffolding, capability scan, checklist parsing and worktree lifecycle.",
   "author": {
     "name": "GgvGomes",
     "url": "https://github.com/GgvGomes"
   },
-  "homepage": "https://github.com/GgvGomes/ailfred",
-  "repository": "https://github.com/GgvGomes/ailfred",
+  "homepage": "https://github.com/linum-core/ailfred",
+  "repository": "https://github.com/linum-core/ailfred",
   "keywords": [
     "planning",
     "prd",
