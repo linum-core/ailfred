@@ -37,7 +37,7 @@ clean and nothing lands in `.gitignore`.
 - Tasks share files, or the change is a broad reformat/codemod.
 - The task edits dependency manifests, lockfiles, or global config (foundation task: main tree, alone, first).
 - Validation needs a single exclusive resource — one dev server, one fixed port, one database.
-- The step has a single task, or the developer chose `sequential` at gate **G-G4**.
+- The step has a single task, or the developer chose `single` at gate **G-G4**.
 - The repo is mid-merge/mid-rebase, or the developer has uncommitted work they have not agreed to park.
 
 Sequential in the main tree is the default. Parallel isolation is an optimization

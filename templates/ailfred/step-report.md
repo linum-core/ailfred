@@ -2,7 +2,7 @@
 step: SNN
 goal_slug: "{{SLUG}}"
 status: done # active | done | blocked
-mode: sequential # sequential | worktrees
+mode: single # single | parallel
 started: {{DATE}}
 finished: null
 ---

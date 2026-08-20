@@ -1,5 +1,5 @@
 ---
-description: Breaks one large request — or an entire to-do list — into an approvable PRD plus steps and tasks, ready for sequential or worktree-parallel execution
+description: Breaks one large request — or an entire to-do list — into an approvable PRD plus steps and tasks, ready for single-track or worktree-parallel execution
 argument-hint: <objetivo em uma frase | lista de to-dos | --from <arquivo> [--section "<título>"] | --continue | --list>
 ---
 
@@ -16,6 +16,7 @@ como executar (sequencial ou em git worktrees). Domínio-agnóstico: o pedido de
 domínio, o comando define o método.
 
 **Read first:** skill `ailfred-decomposition`. Entrada em lista: skill `ailfred-list-intake`.
+Memória do repositório: skill `ailfred-memory`.
 Paralelismo: skill `ailfred-worktree-execution`.
 **Execução:** `/ailfred-execute`. **Progresso:** `/ailfred-status`.
 
@@ -28,6 +29,7 @@ AF="${CLAUDE_PLUGIN_ROOT:-./ailfred}"   # instalado → cache do plugin; dev nes
 ## Invariantes
 
 - **Escritor único de `state.yaml`: o host.** Subagents devolvem handoff; o host aplica.
+- **Escritor único do vault de memória: o host.** Subagents propõem `memory_notes[]`; o host chama `ailfred-memory-write.sh`. A memória vive em `~/.claude/ailfred/`, nunca no repo do usuário.
 - **Escritor único de PRD/plan/tasks: `ailfred-architect`.** O host não corrige plano inline — rejeita com a violação nomeada e respawna.
 - **Nenhum gate é presumido.** Sem token do desenvolvedor no `state.yaml`, o passo seguinte não roda.
 - **Descoberta não acontece no host.** No máximo `git status`, `git branch --show-current` e leitura de `CLAUDE.md` / `AGENTS.md`. O resto é do `ailfred-architect`.
@@ -59,10 +61,21 @@ cluster escolhido (ex.: `ajustes-execute-home`), não do nome do arquivo.
 
 ```bash
 bash "$AF/scripts/ailfred-scaffold.sh" <slug> "<título>"
-bash "$AF/scripts/ailfred-capability-scan.sh"
+bash "$AF/scripts/ailfred-memory-init.sh"
+bash "$AF/scripts/ailfred-memory-read.sh" --max-notes 12 \
+  > .claude/ailfred/<slug>/memory-context.yaml
 ```
 
 `EXISTS:` no scaffold significa goal já iniciado → seguir como `--continue`.
+
+Ler do `memory-context.yaml` só o cabeçalho (`project`, `vault`, `architecture_fresh_days`)
+e gravar em `state.yaml → project`: `slug`, `memory_path`. Então:
+
+- `architecture_fresh_days` é `null` ou `> 30` → rodar `bash "$AF/scripts/ailfred-capability-scan.sh"`.
+- `<= 30` → **não rodar o scan**: a memória já responde. Essa é a economia do v0.2.
+
+O host **não** lê a lista de notas; ela vai para o architect por caminho. Detalhes na
+skill `ailfred-memory`.
 
 ### Passo 1L — Intake de lista (só no modo lista, mesmo turno)
 
@@ -73,8 +86,12 @@ triagem e o protocolo de write-back. O host não interpreta a lista a olho.
 bash "$AF/scripts/ailfred-scaffold.sh" <slug> "<título>"
 bash "$AF/scripts/ailfred-todo-parse.sh" <arquivo> [--section "<título>"] --pending-only \
   > .claude/ailfred/<slug>/source-items.yaml
-bash "$AF/scripts/ailfred-capability-scan.sh"
+bash "$AF/scripts/ailfred-memory-init.sh"
+bash "$AF/scripts/ailfred-memory-read.sh" --max-notes 12 \
+  > .claude/ailfred/<slug>/memory-context.yaml
 ```
+
+Mesma regra de `architecture_fresh_days` do Passo 1 vale aqui para o capability-scan.
 
 `--pending-only` é o default: item `- [x]` já está feito, entra só no relatório.
 
@@ -93,7 +110,8 @@ goal_slug: <slug>
 source_items_path: .claude/ailfred/<slug>/source-items.yaml
 source_file: <arquivo>
 cluster: <seção escolhida ou "todas">
-capability_scan: <saída do scan, filtrada pelo host>
+capability_scan: <saída do scan, filtrada pelo host — ou "memória fresca, scan não rodou">
+memory_context_path: .claude/ailfred/<slug>/memory-context.yaml
 repo_contracts: [CLAUDE.md, AGENTS.md, .claude/rules/]
 prd_path: .claude/ailfred/<slug>/PRD.md
 ```
@@ -110,15 +128,21 @@ mode: discover+prd
 goal_slug: <slug>
 goal_statement: <objetivo verbatim do desenvolvedor>
 goal_source_path: <caminho, se a entrada foi arquivo>
-capability_scan: <saída do scan, filtrada pelo host para o que é plausível>
+capability_scan: <saída do scan, filtrada pelo host — ou "memória fresca, scan não rodou">
+memory_context_path: .claude/ailfred/<slug>/memory-context.yaml
 repo_contracts: [CLAUDE.md, AGENTS.md, .claude/rules/]
 prd_path: .claude/ailfred/<slug>/PRD.md
 ```
 
 Retorno esperado: resumo comprimido (objetivo, critérios, non-goals, superfícies,
-riscos, capacidades escolhidas) + `open_questions[]`. Nada de PRD colado no chat.
+riscos, capacidades escolhidas) + `open_questions[]` + `memory_notes[]`. Nada de PRD
+colado no chat.
 
-### Passo 3 — Gate G-G1 (só se houver `open_questions`)
+`memory_notes[]` são **propostas**: o host aplica uma a uma com
+`bash "$AF/scripts/ailfred-memory-write.sh" --type <t> --title "..." --tags a,b --body-file <tmp>`
+e atualiza `project.memory_synced_at`. O architect nunca escreve no vault.
+
+### Passo 3 — Gate G-G1-grill (só se houver `open_questions`)
 
 `AskUserQuestion` com até 4 perguntas, cada uma com as opções que o architect propôs
 mais a premissa default. Encaminhar as respostas ao `ailfred-architect` (mesmo modo,
@@ -164,10 +188,10 @@ registrar o token. `ailfred-plan-revise` → respawn com o ajuste. `ailfred-canc
 ### Passo 7 — Gate G-G4 (modo de execução)
 
 Recomendar o modo com base no plano (existe onda com ≥2 tasks `parallel: safe` e
-escopos disjuntos? então `worktrees` é candidato — critérios completos na skill
+escopos disjuntos? então `parallel` é candidato — critérios completos na skill
 `ailfred-worktree-execution`).
 
-- `ailfred-exec-sequential` / `ailfred-exec-worktrees` → gravar `execution_mode` e invocar `/ailfred-execute <slug>` **no mesmo turno**.
+- `ailfred-exec-single` / `ailfred-exec-parallel` → gravar `execution_mode` e invocar `/ailfred-execute <slug>` **no mesmo turno**.
 - `ailfred-exec-later` → gravar `execution_mode` e encerrar informando `/ailfred-execute <slug>`.
 
 Se o branch atual for `main`, oferecer criar `goal/<slug>` como parte deste gate —
@@ -225,7 +249,7 @@ Respostas das perguntas agrupadas voltam ao `ailfred-architect` (mesmo modo, `an
 antes do PRD. Nenhum item `vague` sobrevive como task: ou virou preciso, ou virou spike,
 ou saiu do goal.
 
-### G-G2-prd-approval
+### G-G2-prd
 
 ```
 PRD pronto para revisão — .claude/ailfred/<slug>/PRD.md
@@ -247,7 +271,7 @@ Opções:
   - id: ailfred-cancel        label: Cancelar o goal
 ```
 
-### G-G3-plan-approval
+### G-G3-plan
 
 ```
 Plano pronto para revisão — .claude/ailfred/<slug>/plan.md
@@ -266,23 +290,23 @@ Opções:
   - id: ailfred-cancel        label: Cancelar o goal
 ```
 
-### G-G4-execution-mode
+### G-G4-execute
 
 ```
 Como executar o goal <slug>?
 
-Recomendação: <sequencial | worktrees> — <motivo em uma linha>
+Recomendação: <single | parallel> — <motivo em uma linha>
 Branch atual: <branch>
 Ondas paralelizáveis: <lista ou nenhuma>
 Limite de paralelismo: <max_parallel>
 
 Opções:
-  - id: ailfred-exec-sequential  label: Sequencial na árvore principal
-  - id: ailfred-exec-worktrees   label: Paralelo em git worktrees
+  - id: ailfred-exec-single      label: Single — tarefas em série na árvore principal
+  - id: ailfred-exec-parallel    label: Parallel — git worktrees em paralelo
   - id: ailfred-exec-later       label: Só planejar agora
 ```
 
-### G-G5-step-closure e G-G6-goal-closure
+### G-S-step-closure e G-G5-deliver
 
 Emitidos por `/ailfred-execute` — blocos em `${CLAUDE_PLUGIN_ROOT}/commands/ailfred-execute.md § Gate registry`.
 
@@ -290,6 +314,7 @@ Emitidos por `/ailfred-execute` — blocos em `${CLAUDE_PLUGIN_ROOT}/commands/ai
 
 - `.claude/ailfred/<slug>/state.yaml` (host, escritor único).
 - `.claude/ailfred/<slug>/` via `ailfred-scaffold.sh`.
+- `~/.claude/ailfred/project/<project-slug>/memory/` via `ailfred-memory-write.sh` (nunca à mão).
 - Nada mais. PRD, plano e tasks são escritos pelo `ailfred-architect`.
 
 ## Anti-patterns
@@ -298,6 +323,8 @@ Emitidos por `/ailfred-execute` — blocos em `${CLAUDE_PLUGIN_ROOT}/commands/ai
 - Host explorando o repositório, lendo módulos ou escrevendo o PRD "porque é rápido".
 - Colar PRD, plano ou task inteiros no chat ou em briefing de spawn — passar caminhos e IDs.
 - Pular G-G1 e "assumir" respostas sem registrar a premissa no PRD.
+- Rodar `ailfred-capability-scan.sh` com `architecture_fresh_days <= 30` — a memória já respondeu.
+- Colar o conteúdo do `memory-context.yaml` no prompt do architect: passe o caminho. Ele é cache derivado e pode ser apagado a qualquer momento.
 - Corrigir plano ruim inline em vez de rejeitar com a violação nomeada.
 - Criar branch, commitar ou abrir PR na etapa de planejamento.
 - Tratar `--continue` como novo goal (sobrescreve PRD aprovado).

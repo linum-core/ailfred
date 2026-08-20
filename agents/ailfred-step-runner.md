@@ -24,7 +24,7 @@ AF="${CLAUDE_PLUGIN_ROOT:-./ailfred}"   # installed → plugin cache; dev in thi
 ## Briefing you receive
 
 ```text
-goal_slug, step_id, mode (sequential|worktrees|remediate), max_parallel,
+goal_slug, step_id, mode (single|parallel|remediate), max_parallel,
 base_branch, plan_path, tasks: [SNN-TNN ...], step_validation: [...], report_path
 # mode=remediate also carries: findings: [{ task, file, error }]
 ```
@@ -32,10 +32,10 @@ base_branch, plan_path, tasks: [SNN-TNN ...], step_validation: [...], report_pat
 ## Method
 
 1. Read the task files listed in `tasks` (frontmatter + acceptance is enough to plan the waves) and `plan_path § Mapa de paralelismo`. Do not read the PRD.
-2. **Build the waves.** Foundation tasks first, alone, in the main tree. Then group `parallel: safe` tasks with disjoint `scope_allowlist` into waves of at most `max_parallel`. Any overlap you find that the plan missed → collapse to sequential and record it as a deviation.
+2. **Build the waves.** Foundation tasks first, alone, in the main tree. Then group `parallel: safe` tasks with disjoint `scope_allowlist` into waves of at most `max_parallel`. Any overlap you find that the plan missed → collapse to single and record it as a deviation.
 3. **Per wave:**
    - `mode: worktrees` and the wave has ≥2 tasks → `Agent(subagent_type="ailfred:ailfred-task-worker", isolation="worktree")`, all workers of the wave spawned **in a single message** so they run concurrently. When harness isolation is unavailable, or the worktree must outlive the worker: `bash "$AF/scripts/ailfred-worktree.sh" add <slug> <task-id>` first, then pass `workdir` + `branch` in the briefing.
-   - `mode: sequential`, or a single-task wave → one worker at a time in the main tree.
+   - `mode: single`, or a single-task wave → one worker at a time in the main tree.
    - Briefing per worker: task path, `scope_allowlist`, evidence commands, skills, mode, workdir/branch. **Never** the plan or PRD body.
 4. **Collect.** A worker returning `blocked_by_scope` or `blocked` stops that task only; the rest of the wave continues. Never patch a blocked task yourself.
 5. **Integrate** (worktrees only), serial, in `depends_on` order: `ailfred-worktree.sh integrate <slug> <task-id>`, then re-run `step_validation` **after each merge**. Exit code `2` = conflict → resolve in the main tree using the task files as reference, commit, continue. Repeated conflicts between the same pair → stop the wave and report the overlap; the decomposition is wrong.

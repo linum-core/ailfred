@@ -71,8 +71,8 @@ Próxima ação: <comando exato>
 | `planned` ou `executing` com step pendente | `/ailfred-execute <slug>` |
 | `blocked` | descrever o bloqueio em uma linha, depois `/ailfred-execute <slug> --step SNN` |
 | Worktree órfão | resolver primeiro: `ailfred-worktree.sh integrate` ou `remove` |
-| Todos os steps `done`, sem `REVIEW.md` | `/ailfred-execute <slug>` (fecha no gate G-G6) |
-| Itens fechados com checkbox pendente na origem | `/ailfred-execute <slug>` (gate G-G6 → `ailfred-accept-sync`) |
+| Todos os steps `done`, sem `REVIEW.md` | `/ailfred-execute <slug>` (fecha no gate G-G5-deliver) |
+| Itens fechados com checkbox pendente na origem | `/ailfred-execute <slug>` (gate G-G5-deliver → `ailfred-accept-sync`) |
 | `source_ref` com drift de linha | re-parsear antes de qualquer write-back: `ailfred-todo-parse.sh <arquivo>` |
 | `done` | nada — listar follow-ups, se houver |
 

@@ -7,10 +7,24 @@ goal:
   base_branch: "{{BRANCH}}"
   work_branch: null # branch criado para o goal, quando aplicável
   status: planning # planning | planned | executing | blocked | validating | done | cancelled
-  execution_mode: null # sequential | worktrees
+  execution_mode: null # single | loop | parallel | graph
+  mode_reason: null # uma frase: por que este modo foi escolhido
+  validation: null # full | checkpoints | autonomous
   max_parallel: 3
   prd_version: 1
   plan_version: 1
+
+# Repositório ao qual este goal pertence. Liga o goal à memória persistente.
+project:
+  slug: null # <project-slug>, de scripts/ailfred-project-slug.sh
+  memory_path: null # ~/.claude/ailfred/project/<slug>/memory
+  memory_synced_at: null # ISO8601 da última escrita de memória
+
+# Kanban do goal. O board é a fonte da verdade de posição no fluxo.
+board:
+  path: board.yaml
+  wip_limit: 3
+  updated_at: null
 
 # Origem do goal. Preenchido só quando a entrada foi uma lista de to-dos
 # (skill `ailfred-list-intake`). writeback=false para lista colada, que não tem arquivo.
@@ -26,8 +40,16 @@ source:
   items_synced: [] # item_id já marcado na origem (token ailfred-accept-sync)
 
 # Tokens de gate aprovados pelo desenvolvedor, em ordem.
+# id                   | momento                          | token
+# G-G0-backlog-scope   | escolha de cluster (modo lista)  | ailfred-scope-approve
+# G-G0b-backlog-triage | triagem dos itens                | ailfred-triage-approve
+# G-G1-grill           | perguntas do grill respondidas   | ailfred-grill-done
+# G-G2-prd             | PRD aprovado                     | ailfred-prd-approve
+# G-G3-plan            | plano + tasks aprovados          | ailfred-plan-approve
+# G-G4-execute         | liberação para executar          | ailfred-execute-approve
+# G-G5-deliver         | entrega / merge                  | ailfred-deliver-approve
 gates: []
-# - { id: G-G2, token: ailfred-prd-approve, at: {{DATE}} }
+# - { id: G-G2-prd, token: ailfred-prd-approve, at: {{DATE}}, skipped_by_policy: false }
 
 # Preenchido pelo host depois do gate G-G3 (plano aprovado).
 steps: []
@@ -35,6 +57,7 @@ steps: []
 #   status: pending # pending | active | done | blocked
 #   tasks:
 #     - { id: S01-T01, status: pending, wave: 1, worktree: null, branch: null }
+# NOTA v0.2: `tasks[].status` é espelho derivado de board.yaml, não fonte da verdade.
 
 # Worktrees vivos (espelha `bash .claude/scripts/ailfred-worktree.sh list <slug>`).
 worktrees: []

@@ -1,6 +1,6 @@
 ---
-description: Executes an approved plan step by step — dispatches task workers sequentially or in parallel git worktrees, validates each step and closes with a review against the PRD
-argument-hint: <goal-slug> [--step SNN] [--task SNN-TNN] [--sequential|--worktrees] [--max-parallel N] [--dry-run]
+description: Executes an approved plan step by step — dispatches task workers in single mode or in parallel git worktrees, validates each step and closes with a review against the PRD
+argument-hint: <goal-slug> [--step SNN] [--task SNN-TNN] [--single|--parallel] [--max-parallel N] [--dry-run]
 ---
 
 # Goal — execute (`/ailfred-execute`)
@@ -27,7 +27,7 @@ AF="${CLAUDE_PLUGIN_ROOT:-./ailfred}"   # instalado → cache do plugin; dev nes
 ## Invariantes
 
 - **Escritor único de `state.yaml`: o host.** Workers e orquestradores devolvem handoff.
-- **Um step por vez.** Nunca abrir o step seguinte antes do gate G-G5 do atual.
+- **Um step por vez.** Nunca abrir o step seguinte antes do gate G-S do atual.
 - **Host não implementa.** Nenhuma edição de código no host: quem escreve código é `ailfred-task-worker`.
 - **Escopo é lei.** Task escreve apenas dentro do seu `scope_allowlist`. Escrita fora = task bloqueada e reportada, não "ajustada".
 - **Step fecha verde.** Validação falhando não passa para o próximo step sem token explícito.
@@ -40,10 +40,10 @@ AF="${CLAUDE_PLUGIN_ROOT:-./ailfred}"   # instalado → cache do plugin; dev nes
 1. Ler `.claude/ailfred/<slug>/state.yaml`. Sem slug no argumento: se houver exatamente um goal em `planned|executing|blocked`, usar; se houver vários, `AskUserQuestion`; se nenhum, apontar `/ailfred`.
 2. Exigir `ailfred-plan-approve` em `gates`. Sem o token → parar e apontar `/ailfred`.
 3. `git status --porcelain` + `git branch --show-current`.
-   - Árvore suja → `AskUserQuestion`: commitar antes, seguir mesmo assim (só modo sequencial) ou abortar. Worktrees exigem árvore limpa.
+   - Árvore suja → `AskUserQuestion`: commitar antes, seguir mesmo assim (só modo `single`) ou abortar. Worktrees exigem árvore limpa.
    - Branch `main` → oferecer `git checkout -b ailfred/<slug>` e gravar em `work_branch`.
 4. `bash "$AF/scripts/ailfred-worktree.sh" list <slug>` — worktrees órfãos de execução anterior. Existindo, reconciliar `state.yaml → worktrees` e resolver (integrar ou remover) **antes** de dispatch novo.
-5. Flags sobrepõem `state.yaml` só nesta execução: `--sequential`, `--worktrees`, `--max-parallel N`.
+5. Flags sobrepõem `state.yaml` só nesta execução: `--single`, `--parallel`, `--max-parallel N`.
 6. `--dry-run` → imprimir a tabela de dispatch (steps, ondas, tasks, modo, branches previstos) e encerrar. Nenhum spawn.
 
 ### Passo 1 — Selecionar o step
@@ -60,7 +60,7 @@ Com `--task SNN-TNN`: executar só essa task (retomada pontual), sem fechar o st
 Agent(subagent_type="ailfred:ailfred-step-runner")
 goal_slug: <slug>
 step_id: SNN
-mode: sequential | worktrees
+mode: single | parallel
 max_parallel: <n>
 base_branch: <work_branch ou base_branch>
 plan_path: .claude/ailfred/<slug>/plan.md
@@ -90,10 +90,10 @@ report_path: .claude/ailfred/<slug>/steps/SNN-report.md
 
 Falha → no máximo **2 ciclos de remediação** automáticos: o host respawna
 `ailfred-step-runner` em `mode: remediate` com os achados (task, arquivo, erro). Na
-terceira falha, parar e emitir G-G5 com `ailfred-step-fix` como recomendação — nunca
+terceira falha, parar e emitir G-S com `ailfred-step-fix` como recomendação — nunca
 insistir em loop.
 
-### Passo 4 — Gate G-G5 (fechamento do step)
+### Passo 4 — Gate G-S (fechamento do step)
 
 `ailfred-step-accept` → step `done`, atualizar `state.yaml`, e **seguir para o próximo
 step no mesmo turno** (volta ao Passo 1). Goal originado de lista: registrar em
@@ -115,7 +115,7 @@ review_path: .claude/ailfred/<slug>/REVIEW.md
 ```
 
 Conferir também: nenhum worktree vivo (`ailfred-worktree.sh list <slug>` vazio) e
-nenhuma task fora de `done|skipped`. Depois, gate G-G6.
+nenhuma task fora de `done|skipped`. Depois, gate G-G5-deliver.
 
 ### Passo 6 — Write-back na lista de origem (só com token `ailfred-accept-sync`)
 
@@ -140,7 +140,7 @@ checklist final na resposta.
 
 ## Gate registry
 
-### G-G5-step-closure
+### G-S-step-closure
 
 ```
 Step SNN — <nome> — encerrado
@@ -162,7 +162,7 @@ Opções:
   - id: ailfred-stop         label: Parar aqui (retomo depois)
 ```
 
-### G-G6-goal-closure
+### G-G5-deliver
 
 ```
 Goal <slug> — execução concluída
@@ -188,16 +188,35 @@ Opções:
 `ailfred-accept-sync` só aparece quando `source.writeback` é `true`. É o único token que
 autoriza escrever na lista de origem.
 
+### Passo 7 — Alimentar a memória do repositório (após `ailfred-accept*`)
+
+Fechado o goal, grave o que o próximo goal deste repo pagaria para redescobrir. Contrato
+na skill `ailfred-memory`; o host é o escritor.
+
+```bash
+AF="${CLAUDE_PLUGIN_ROOT:-./ailfred}"
+bash "$AF/scripts/ailfred-memory-write.sh" --type goal --goal-slug <slug> \
+  --title "<objetivo em uma frase>" --tags <áreas> --body-file <tmp>
+```
+
+- **Uma** nota `goal`: o que entregou, onde vive, o que ficou de follow-up.
+- **Uma** nota `decision` por gate cuja escolha não foi óbvia (o porquê e a alternativa
+  descartada), e uma `pitfall` por falha que custou uma rodada de correção.
+- Atualizar `state.yaml → project.memory_synced_at`.
+- Nada de segredo, log bruto ou trecho longo de código. Aponte `caminho:linha`.
+
 ## Authorized writes
 
 - `.claude/ailfred/<slug>/state.yaml` (host, escritor único).
 - Branch novo `goal/<slug>` quando o desenvolvedor autorizar no Passo 0.
 - Código e relatórios: pelos subagents, dentro dos escopos declarados.
 - **Uma linha de checkbox** por item concluído na `source.file`, via `ailfred-todo-sync.sh`, somente com token `ailfred-accept-sync`. Nada mais nesse arquivo.
+- `~/.claude/ailfred/project/<project-slug>/memory/` via `ailfred-memory-write.sh` (Passo 7).
 
 ## Anti-patterns
 
 - Executar sem `ailfred-plan-approve` registrado, ou sem `execution_mode` definido.
+- Fechar o goal sem alimentar a memória — o próximo goal paga a descoberta de novo.
 - Host editando código, resolvendo conflito ou rodando task "porque é pequena".
 - Abrir onda nova com branch da onda anterior sem integrar (ver skill `ailfred-worktree-execution`).
 - Merge de tudo no fim, em lote, em vez de integrar e validar por task.

@@ -14,7 +14,8 @@ into a **step/task backlog a worker can execute without re-planning**. Single wr
 never writes `state.yaml` (host-owned), never emits gates (host-owned).
 
 **Read first:** skill `ailfred-decomposition` (quality bar, sizing, parallel-safety test,
-rejection checklist). Paralelismo: skill `ailfred-worktree-execution`.
+rejection checklist). Paralelismo: skill `ailfred-worktree-execution`. Memória do
+repositório: skill `ailfred-memory`.
 
 ## Modes
 
@@ -49,11 +50,13 @@ Follow skill `ailfred-list-intake`; the short version:
 
 ## Method — `discover+prd`
 
+0. **Read `memory_context_path` first.** It is a compressed index of what previous goals in this repository already established: architecture, decisions, hot surfaces, pitfalls. Open a note's `path` only when it bears on this goal. Never re-discover what a `confidence: high` note already answers — cite it as `[[titulo]]` in the PRD instead. Contradicting evidence beats the note; when that happens, propose an updated note in `memory_notes[]`.
 1. Read the repo contracts named in the briefing (`CLAUDE.md`, `AGENTS.md`, `.claude/rules/`) and the goal source file when given.
 2. **Bounded discovery.** Locate only the surfaces the goal actually touches: search by symbol and path, read excerpts, stop when the surface list stabilizes. Never read the whole tree, never open a file "for context" that no criterion depends on. Delegate broad sweeps to `Agent(subagent_type="Explore")` when the surface is genuinely unknown.
 3. Fill `PRD.md` from the template. Every affected surface is a path you actually opened; every success criterion carries its verification.
 4. Give a verdict for **every** plausible capability in the scan (§9): reuse it, or discard it with a reason. `ref` entries are read on demand — cite the path.
-5. Everything you could not resolve becomes an entry in §8 with the assumption you would adopt if nobody answers. Prefer 2–4 sharp questions over a vague one.
+5. Propose `memory_notes[]` for what a **future** goal in this repo would pay to rediscover: how the repo is built and tested (`architecture`), a hot surface and its trap (`surface`), a pitfall you hit. One durable fact per note; never a secret, never a session log. The host writes them — you do not touch the vault.
+6. Everything you could not resolve becomes an entry in §8 with the assumption you would adopt if nobody answers. Prefer 2–4 sharp questions over a vague one.
 
 ## Method — `decompose`
 
@@ -86,6 +89,7 @@ surfaces: [<path> ...]
 high_risks: [<one line each>]
 capabilities: [<name> → <use|discard + reason>]
 open_questions: [{ question, proposed_options, default_assumption }]
+memory_notes: [{ type, title, tags, confidence, supersedes, body }]  # propostas; o host grava
 # intake only:
 clusters: [{ section, items, coherent: yes|no }]
 triage: [{ item_id, text_short, disposition, becomes }]
@@ -113,3 +117,5 @@ self_check: pass | <violations found and fixed>
 - Editing an approved PRD without bumping `prd_version` and saying so in the handoff.
 - List mode: reading the raw checklist instead of `source-items.yaml`, inventing item ids, promoting a note to a task silently, leaving a `vague` item as a task, or implementing a `developer-action` item yourself.
 - One question per list item instead of at most 4 grouped ones.
+- Writing into the memory vault, or re-running discovery over ground a fresh `architecture` note already covers.
+- Putting a secret, a credential name's value, a raw log or a long code excerpt into `memory_notes[]`.
